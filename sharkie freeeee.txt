@@ -1,0 +1,218 @@
+-- ================================================
+-- SHARKIE HUB - SOLO "delet walls" (VERSIÓN CHICA + MEJORADA)
+-- GUI MUCHO más pequeña + stack persistente + delete por CLICK
+-- ================================================
+
+if getgenv and getgenv().SharkieDeleteWallsLoaded then return end
+getgenv().SharkieDeleteWallsLoaded = true
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+
+print("[SHARKIE] Cargando delet walls CHICO...")
+
+-- ================================================
+-- BYPASS BÁSICO
+-- ================================================
+pcall(function()
+    local mt = getrawmetatable(game)
+    local oldNamecall = mt.__namecall
+    setreadonly(mt, false)
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
+        local blocked = {"Kick","kick","Ban","ban","TeleportDetect","AntiCheat","CHECKER","SPEEDCHECK","POSITIONCHECK","OneMoreTime","BR_KICKPC","KICKREMOTE","BANREMOTE","ExploitDetected","ReportCheat","Detect","Punish","Crash","Log","Flag"}
+        if table.find(blocked, method) then return end
+        if method == "FireServer" or method == "InvokeServer" then
+            local name = tostring(self)
+            for _, str in ipairs({"Kick","Ban","Anti","Exploit","Report","Detect","Punish","Crash","Log","Flag","Adonis","Byfron","AC"}) do
+                if name:lower():find(str:lower()) then return end
+            end
+        end
+        return oldNamecall(self, ...)
+    end)
+    setreadonly(mt, true)
+    hookfunction(player.Kick, function() end)
+    player.Kick = function() end
+end)
+
+-- ================================================
+-- GUI MUCHO MÁS CHICA
+-- ================================================
+local sg = Instance.new("ScreenGui")
+sg.Name = "SharkieDeleteWalls"
+sg.ResetOnSpawn = false
+sg.ZIndexBehavior = Enum.ZIndexBehavior.Global
+sg.Parent = player:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 260, 0, 130)        -- MUCHO más chica
+mainFrame.Position = UDim2.new(0.5, -130, 0.5, -65)
+mainFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 45)
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = sg
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+
+local stroke = Instance.new("UIStroke", mainFrame)
+stroke.Color = Color3.fromRGB(170, 90, 255)
+stroke.Thickness = 2.5
+
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundTransparency = 1
+title.Text = "sharkie hub"
+title.TextColor3 = Color3.fromRGB(210, 90, 255)
+title.TextSize = 22
+title.Font = Enum.Font.GothamBlack
+title.TextStrokeTransparency = 0.8
+
+-- Botón ÚNICO más pequeño
+local deletBtn = Instance.new("TextButton", mainFrame)
+deletBtn.Size = UDim2.new(0.88, 0, 0, 48)
+deletBtn.Position = UDim2.new(0.06, 0, 0.42, 0)
+deletBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 70)
+deletBtn.Text = "delet walls [OFF]"
+deletBtn.TextColor3 = Color3.new(1, 1, 1)
+deletBtn.TextSize = 20
+deletBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", deletBtn).CornerRadius = UDim.new(0, 10)
+
+local btnStroke = Instance.new("UIStroke", deletBtn)
+btnStroke.Color = Color3.fromRGB(170, 90, 255)
+btnStroke.Thickness = 2
+
+-- ================================================
+-- VARIABLES (stack PERSISTENTE entre ON/OFF)
+-- ================================================
+local deletedStack = {}      -- NO se borra al desactivar
+local deleteTool = nil
+local repairTool = nil
+local active = false
+
+local function updateRepairName()
+    if repairTool then
+        repairTool.Name = "reparar (" .. #deletedStack .. ") 🟩"
+    end
+end
+
+local function createTools()
+    if deleteTool or repairTool then return end
+
+    -- ==================== TOOL 1: delet ✖️ (AHORA POR CLICK) ====================
+    deleteTool = Instance.new("Tool")
+    deleteTool.Name = "delet ✖️"
+    local delHandle = Instance.new("Part")
+    delHandle.Name = "Handle"
+    delHandle.Transparency = 1
+    delHandle.CanCollide = false
+    delHandle.Size = Vector3.new(0.2, 0.2, 3)
+    delHandle.Parent = deleteTool
+    deleteTool.Parent = player.Backpack
+
+    local deleteActivatedConn
+    deleteTool.Equipped:Connect(function()
+        deleteActivatedConn = deleteTool.Activated:Connect(function()
+            local target = mouse.Target
+            if not target then return end
+            if target:IsDescendantOf(player.Character) then return end
+
+            local success, clone = pcall(function() return target:Clone() end)
+            if success and clone then
+                table.insert(deletedStack, {
+                    clone = clone,
+                    originalParent = target.Parent,
+                    originalName = target.Name
+                })
+                target:Destroy()
+                updateRepairName()
+                print("🗑️ Eliminado: " .. (clone.Name or "objeto"))
+            end
+        end)
+    end)
+
+    deleteTool.Unequipped:Connect(function()
+        if deleteActivatedConn then deleteActivatedConn:Disconnect() end
+    end)
+
+    -- ==================== TOOL 2: reparar (N) 🟩 ====================
+    repairTool = Instance.new("Tool")
+    repairTool.Name = "reparar (" .. #deletedStack .. ") 🟩"
+    local repHandle = Instance.new("Part")
+    repHandle.Name = "Handle"
+    repHandle.Transparency = 1
+    repHandle.CanCollide = false
+    repHandle.Size = Vector3.new(0.2, 0.2, 3)
+    repHandle.Parent = repairTool
+    repairTool.Parent = player.Backpack
+
+    local repairActivatedConn
+    repairTool.Equipped:Connect(function()
+        repairActivatedConn = repairTool.Activated:Connect(function()
+            if #deletedStack == 0 then return end
+            local data = table.remove(deletedStack)
+            local success, restored = pcall(function()
+                local r = data.clone:Clone()
+                r.Parent = data.originalParent or workspace
+                r.Name = data.originalName
+                return r
+            end)
+            if success then
+                updateRepairName()
+                print("🟩 Restaurado: " .. (restored.Name or "objeto"))
+            end
+        end)
+    end)
+
+    repairTool.Unequipped:Connect(function()
+        if repairActivatedConn then repairActivatedConn:Disconnect() end
+    end)
+end
+
+-- ================================================
+-- BOTÓN DE ACTIVACIÓN (stack NO se borra)
+-- ================================================
+deletBtn.MouseButton1Click:Connect(function()
+    active = not active
+
+    if active then
+        deletBtn.Text = "delet walls [ON]"
+        deletBtn.BackgroundColor3 = Color3.fromRGB(60, 170, 90)
+        createTools()
+        print("✅ Tools cargados (stack guardado: " .. #deletedStack .. " cosas)")
+    else
+        deletBtn.Text = "delet walls [OFF]"
+        deletBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 70)
+
+        -- Solo borramos los tools, el stack se mantiene
+        if deleteTool then deleteTool:Destroy() end
+        if repairTool then repairTool:Destroy() end
+        deleteTool = nil
+        repairTool = nil
+        print("🛑 Tools removidos (stack guardado: " .. #deletedStack .. " cosas)")
+    end
+end)
+
+-- Botón cerrar
+local closeBtn = Instance.new("TextButton", mainFrame)
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.BackgroundTransparency = 1
+closeBtn.Text = "✕"
+closeBtn.TextColor3 = Color3.fromRGB(255, 70, 70)
+closeBtn.TextSize = 22
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.MouseButton1Click:Connect(function()
+    sg:Destroy()
+    print("[SHARKIE] GUI cerrada")
+end)
+
+print("[SHARKIE] ¡Listo! GUI chica activada.")
+print("   • delet ✖️  → Equípalo y haz CLICK IZQUIERDO donde quieras borrar")
+print("   • reparar (N) 🟩 → Equípalo y haz CLICK para restaurar (última primero)")
+print("   • El contador se guarda aunque apagues/enciendas el botón")
