@@ -1,0 +1,255 @@
+-- ================================================
+-- SHARKIE HUB - SOLO "delet walls" (VERSIÓN CHICA + BYPASS SUPER POTENTE)
+-- GUI CHICA + ANTI-KICK SUPERRRR POTENTE + ANTI-BAN SUPERRRR POTENTE
+-- ================================================
+
+if getgenv and getgenv().SharkieDeleteWallsLoaded then return end
+getgenv().SharkieDeleteWallsLoaded = true
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+
+print("[SHARKIE] Cargando delet walls CHICO + BYPASS SUPER POTENTE...")
+
+-- ================================================
+-- BYPASS SUPER POTENTE + ANTI-KICK + ANTI-BAN (MÁXIMA PROTECCIÓN)
+-- ================================================
+print("[BYPASS] Activando ANTI-KICK + ANTI-BAN SUPER POTENTE...")
+
+pcall(function()
+    -- Hook principal ultra reforzado
+    local mt = getrawmetatable(game)
+    local oldNamecall = mt.__namecall
+    setreadonly(mt, false)
+
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
+        
+        -- LISTA ULTRA COMPLETA de métodos bloqueados (anti-kick + anti-ban)
+        local blockedMethods = {
+            "Kick", "kick", "Ban", "ban", "TeleportDetect", "AntiCheat", "CHECKER", "SPEEDCHECK",
+            "POSITIONCHECK", "OneMoreTime", "BR_KICKPC", "KICKREMOTE", "BANREMOTE", "ExploitDetected",
+            "ReportCheat", "Detect", "Punish", "Crash", "Log", "Flag", "Adonis", "Byfron", "AC",
+            "Anti", "Cheat", "Hacker", "Moderator", "Admin", "Staff", "Report", "Violation",
+            "Suspicious", "Abuse", "Exploit", "Malicious", "Security", "Guard", "Sentinel",
+            "Hyperion", "Krampus", "Vanguard", "AntiCheatKick", "AntiBan", "ForceKick", "ServerKick",
+            "ClientKick", "RemoteKick", "BanPlayer", "PunishPlayer", "RemovePlayer", "DestroyPlayer"
+        }
+
+        if table.find(blockedMethods, method) then
+            print("[ANTI-KICK] Bloqueado método peligroso: " .. method)
+            return
+        end
+
+        -- Bloqueo reforzado en FireServer / InvokeServer
+        if method == "FireServer" or method == "InvokeServer" then
+            local remoteName = tostring(self.Name or self)
+            for _, str in ipairs(blockedMethods) do
+                if remoteName:lower():find(str:lower()) then
+                    print("[ANTI-BAN] Bloqueado remote peligroso: " .. remoteName)
+                    return
+                end
+            end
+        end
+
+        return oldNamecall(self, ...)
+    end)
+
+    setreadonly(mt, true)
+
+    -- ANTI-KICK DIRECTO (múltiples capas)
+    hookfunction(player.Kick, function() print("[ANTI-KICK] Intento de kick bloqueado") end)
+    player.Kick = function() print("[ANTI-KICK] Intento de kick bloqueado") end
+
+    -- Protección extra contra CharacterRemoving y desconexiones forzadas
+    if player.Character then
+        for _, conn in pairs(getconnections(player.Character.AncestryChanged)) do
+            if conn.Function and tostring(conn.Function):find("Kick") then conn:Disable() end
+        end
+    end
+
+    -- Bloqueo global de kicks del juego
+    hookfunction(game.Players.LocalPlayer.Kick, function() end)
+    game.Players.LocalPlayer.Kick = function() end
+
+    print("[BYPASS SUPER POTENTE] ANTI-KICK + ANTI-BAN cargado al 100% 🔥")
+end)
+
+-- ================================================
+-- GUI MUCHO MÁS CHICA (igual que antes)
+-- ================================================
+local sg = Instance.new("ScreenGui")
+sg.Name = "SharkieDeleteWalls"
+sg.ResetOnSpawn = false
+sg.ZIndexBehavior = Enum.ZIndexBehavior.Global
+sg.Parent = player:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 260, 0, 130)
+mainFrame.Position = UDim2.new(0.5, -130, 0.5, -65)
+mainFrame.BackgroundColor3 = Color3.fromRGB(28, 28, 45)
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = sg
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+
+local stroke = Instance.new("UIStroke", mainFrame)
+stroke.Color = Color3.fromRGB(170, 90, 255)
+stroke.Thickness = 2.5
+
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundTransparency = 1
+title.Text = "sharkie hub"
+title.TextColor3 = Color3.fromRGB(210, 90, 255)
+title.TextSize = 22
+title.Font = Enum.Font.GothamBlack
+title.TextStrokeTransparency = 0.8
+
+local deletBtn = Instance.new("TextButton", mainFrame)
+deletBtn.Size = UDim2.new(0.88, 0, 0, 48)
+deletBtn.Position = UDim2.new(0.06, 0, 0.42, 0)
+deletBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 70)
+deletBtn.Text = "delet walls [OFF]"
+deletBtn.TextColor3 = Color3.new(1, 1, 1)
+deletBtn.TextSize = 20
+deletBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", deletBtn).CornerRadius = UDim.new(0, 10)
+
+local btnStroke = Instance.new("UIStroke", deletBtn)
+btnStroke.Color = Color3.fromRGB(170, 90, 255)
+btnStroke.Thickness = 2
+
+-- ================================================
+-- VARIABLES (stack PERSISTENTE)
+-- ================================================
+local deletedStack = {}
+local deleteTool = nil
+local repairTool = nil
+local active = false
+
+local function updateRepairName()
+    if repairTool then
+        repairTool.Name = "reparar (" .. #deletedStack .. ") 🟩"
+    end
+end
+
+local function createTools()
+    if deleteTool or repairTool then return end
+
+    -- TOOL 1: delet ✖️ (click izquierdo)
+    deleteTool = Instance.new("Tool")
+    deleteTool.Name = "delet ✖️"
+    local delHandle = Instance.new("Part")
+    delHandle.Name = "Handle"
+    delHandle.Transparency = 1
+    delHandle.CanCollide = false
+    delHandle.Size = Vector3.new(0.2, 0.2, 3)
+    delHandle.Parent = deleteTool
+    deleteTool.Parent = player.Backpack
+
+    local deleteActivatedConn
+    deleteTool.Equipped:Connect(function()
+        deleteActivatedConn = deleteTool.Activated:Connect(function()
+            local target = mouse.Target
+            if not target then return end
+            if target:IsDescendantOf(player.Character) then return end
+
+            local success, clone = pcall(function() return target:Clone() end)
+            if success and clone then
+                table.insert(deletedStack, {
+                    clone = clone,
+                    originalParent = target.Parent,
+                    originalName = target.Name
+                })
+                target:Destroy()
+                updateRepairName()
+                print("🗑️ Eliminado: " .. (clone.Name or "objeto"))
+            end
+        end)
+    end)
+
+    deleteTool.Unequipped:Connect(function()
+        if deleteActivatedConn then deleteActivatedConn:Disconnect() end
+    end)
+
+    -- TOOL 2: reparar (N) 🟩
+    repairTool = Instance.new("Tool")
+    repairTool.Name = "reparar (" .. #deletedStack .. ") 🟩"
+    local repHandle = Instance.new("Part")
+    repHandle.Name = "Handle"
+    repHandle.Transparency = 1
+    repHandle.CanCollide = false
+    repHandle.Size = Vector3.new(0.2, 0.2, 3)
+    repHandle.Parent = repairTool
+    repairTool.Parent = player.Backpack
+
+    local repairActivatedConn
+    repairTool.Equipped:Connect(function()
+        repairActivatedConn = repairTool.Activated:Connect(function()
+            if #deletedStack == 0 then return end
+            local data = table.remove(deletedStack)
+            local success, restored = pcall(function()
+                local r = data.clone:Clone()
+                r.Parent = data.originalParent or workspace
+                r.Name = data.originalName
+                return r
+            end)
+            if success then
+                updateRepairName()
+                print("🟩 Restaurado: " .. (restored.Name or "objeto"))
+            end
+        end)
+    end)
+
+    repairTool.Unequipped:Connect(function()
+        if repairActivatedConn then repairActivatedConn:Disconnect() end
+    end)
+end
+
+-- ================================================
+-- BOTÓN DE ACTIVACIÓN
+-- ================================================
+deletBtn.MouseButton1Click:Connect(function()
+    active = not active
+
+    if active then
+        deletBtn.Text = "delet walls [ON]"
+        deletBtn.BackgroundColor3 = Color3.fromRGB(60, 170, 90)
+        createTools()
+        print("✅ Tools cargados (stack guardado: " .. #deletedStack .. " cosas)")
+    else
+        deletBtn.Text = "delet walls [OFF]"
+        deletBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 70)
+
+        if deleteTool then deleteTool:Destroy() end
+        if repairTool then repairTool:Destroy() end
+        deleteTool = nil
+        repairTool = nil
+        print("🛑 Tools removidos (stack guardado: " .. #deletedStack .. " cosas)")
+    end
+end)
+
+-- Botón cerrar
+local closeBtn = Instance.new("TextButton", mainFrame)
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.BackgroundTransparency = 1
+closeBtn.Text = "✕"
+closeBtn.TextColor3 = Color3.fromRGB(255, 70, 70)
+closeBtn.TextSize = 22
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.MouseButton1Click:Connect(function()
+    sg:Destroy()
+    print("[SHARKIE] GUI cerrada")
+end)
+
+print("[SHARKIE] ¡Listo! GUI chica + BYPASS SUPER POTENTE activado.")
+print("   • delet ✖️  → Equípalo y haz CLICK IZQUIERDO donde quieras borrar")
+print("   • reparar (N) 🟩 → Equípalo y haz CLICK para restaurar")
+print("   • El contador se guarda aunque apagues/enciendas")
+print("   • ANTI-KICK y ANTI-BAN al máximo 🔥")
